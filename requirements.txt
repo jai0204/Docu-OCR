@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+easyocr
+numpy==1.23.5
+opencv-python-headless==4.8.0.74
