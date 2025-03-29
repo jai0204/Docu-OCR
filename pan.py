@@ -1,4 +1,5 @@
 import re
+import logging
 
 PAN_REGEX = r'\b[A-Z]{5}[0-9]{4}[A-Z]{1}\b'
 
@@ -37,12 +38,15 @@ def rectify_pan_number(pan_text):
 
 def process_pan(results):
     text = extract_text_from_image(results)
+    logging.info(f"Text: {text}")
     print(f"Text: {text}")
     pan_number = extract_pan_number(text)
     name = extract_name(text, results)
     dob = extract_dob(text, results)
     father_name = extract_father_name(text, results, name)
+    logging.info(f"PAN: {pan_number}" + f" Name: {name}" + f" DOB: {dob}" + f" Father Name: {father_name}")
     return {
+        "document_type": "PAN",
         "pan_number": pan_number,
         "name": name,
         "dob": dob,

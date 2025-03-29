@@ -1,4 +1,5 @@
 import re
+import logging
 
 AADHAAR_REGEX = r'\b\d{4} \d{4} \d{4}\b'
 
@@ -31,12 +32,15 @@ def rectify_aadhaar_number(aadhaar_text):
 
 def process_aadhaar(results):
     text = extract_text_from_image(results)
+    logging.info(f"Text: {text}")
     print(f"Text: {text}")
     aadhaar_number = extract_aadhaar_number(text)
     name = extract_name(text, results)
     dob = extract_dob(text, results)
     gender = extract_gender(text, results)
+    logging.info(f"AADHAAR: {aadhaar_number}" + f" Name: {name}" + f" DOB: {dob}" + f" Gender: {gender}")
     return {
+        "document_type": "AADHAAR",
         "aadhaar_number": aadhaar_number,
         "name": name,
         "dob": dob,

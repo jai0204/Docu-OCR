@@ -4,9 +4,15 @@ import cv2
 import numpy as np
 import uvicorn
 import re
+import logging
 from aadhaar import check_if_aadhaar, process_aadhaar
 from pan import check_if_pan, process_pan
 
+# Set up logging
+logging.basicConfig(filename="app.log", level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.info("OCR service started.")
+
+# Initialize FastAPI app
 app = FastAPI()
 
 # ✅ Load EasyOCR once at startup
@@ -21,6 +27,7 @@ def is_blurry(image, results, base_threshold=40, min_threshold=20, max_threshold
     dynamic_threshold = base_threshold - (text_ratio * 65)
     dynamic_threshold = max(min_threshold, min(dynamic_threshold, max_threshold))
 
+    logging.info(f"Blur Score: {blur_score}, Dynamic Threshold: {dynamic_threshold}, Text Ratio: {text_ratio:.2f}")
     print(f"Blur Score: {blur_score}, Dynamic Threshold: {dynamic_threshold}, Text Ratio: {text_ratio:.2f}")
 
     return blur_score < dynamic_threshold
@@ -58,8 +65,10 @@ def extract_text_from_image(results):
 def extract_results_from_image(image):
     """Extract text using EasyOCR"""
     results = reader.readtext(image)
+    logging.info(f"Extracted {len(results)} text regions:")
     print("\n🔍 Extracted Text:")
     for bbox, text, prob in results:
+        logging.info(f"Text: {text} (Confidence: {prob:.2f})")
         print(f"{text} (Confidence: {prob:.2f})")
     return results   
 
@@ -75,16 +84,20 @@ def classify_document(results):
 async def process_ocr(file: UploadFile = File(...)):
     # ✅ File type restriction
     if file.content_type not in ["image/jpeg", "image/png"]:
+        logging.error(f"Invalid file type: {file.filename} - {file.content_type}")
         raise HTTPException(status_code=400, detail="Only JPEG and PNG files are allowed.")
 
     # ✅ File size restriction (5MB)
     if file.size > 5 * 1024 * 1024:
+        logging.error(f"File size too large: {file.filename} - {file.size} bytes")
         raise HTTPException(status_code=400, detail="File size must be less than 5MB.")
 
     file_bytes = await file.read()
 
     # Convert to OpenCV format
     image = cv2.imdecode(np.frombuffer(file_bytes, np.uint8), cv2.IMREAD_COLOR)
+
+    logging.info(f"Received file: {file.filename}, Size: {file.size} bytes, Type: {file.content_type}")
 
     # Extract results using EasyOCR
     results = extract_results_from_image(image)
@@ -96,10 +109,12 @@ async def process_ocr(file: UploadFile = File(...)):
     # ✅ Step 2: Check for low contrast
     contrast_score = check_contrast(image)
     if contrast_score < 40:  # Adjust threshold as needed
+        logging.warning("Low contrast detected.")
         return {"error": "Image contrast is too low for OCR processing."}
 
     # Classify document type
     doc_type = classify_document(results)
+    logging.info(f"Document Type: {doc_type}")
 
     if doc_type == "unknown":
         return {"error": "No Aadhaar or PAN detected"}
