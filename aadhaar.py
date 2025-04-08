@@ -58,7 +58,7 @@ def extract_name(text, results):
     name_pattern_1 = r'(?i)(?:name)[\s:-]+([A-Za-z ]+)'
     name_pattern_2_1 = r'(?i)(?:Government of India|Govt. of India|GovernmentofIndia|Governmentof India|Government ofIndia|Unique Identification Authority of India)[\s\n]+(?:Government of India|Govt. of India|GovernmentofIndia|Governmentof India|Government ofIndia|Unique Identification Authority of India)?[\s\n]*'
     name_pattern_2_2 = r'^(.*?)(?:\b(?:Address|DOB|Date of Birth|Year of Birth)\b)'
-    name_pattern_2_3 = r'^.*?(?<!\S)([A-Za-z]+\s[A-Za-z\s]+)(?!\S).*?$'
+    name_pattern_2_3 = r'^.*?(?<!\S)([A-Z][a-z]+(?:\s[A-Z][a-z]+)*).*?(?<!\S).*?$'
 
     name = re.search(name_pattern_2_2, text, re.DOTALL)
     if name:

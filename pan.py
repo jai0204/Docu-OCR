@@ -49,8 +49,8 @@ def process_pan(results):
         "document_type": "PAN",
         "pan_number": pan_number,
         "name": name,
-        "dob": dob,
-        "father_name": father_name
+        "fathers_name": father_name,
+        "dob": dob
     }
 
 def extract_pan_number(text):
