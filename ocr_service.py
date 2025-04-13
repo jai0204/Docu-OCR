@@ -6,6 +6,7 @@ import uvicorn
 import re
 import os
 import logging
+import time
 from logging.handlers import RotatingFileHandler
 from aadhaar import check_if_aadhaar, process_aadhaar
 from pan import check_if_pan, process_pan
@@ -92,8 +93,22 @@ def classify_document(results):
         return "pan"
     return "unknown"
 
+def preprocess_image_for_ocr(image):
+    image = resize_if_large(image)
+    #image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    return image
+
+def resize_if_large(image, max_dim=2000):
+    h, w = image.shape[:2]
+    if max(h, w) > max_dim:
+        scale = max_dim / float(max(h, w))
+        new_w, new_h = int(w * scale), int(h * scale)
+        return cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
+    return image
+
 @app.post("/process_ocr/")
 async def process_ocr(file: UploadFile = File(...)):
+    startTime = time.time()
     # ✅ File type restriction
     if file.content_type not in ["image/jpeg", "image/png"]:
         logger.error(f"Invalid file type: {file.filename} - {file.content_type}")
@@ -108,6 +123,7 @@ async def process_ocr(file: UploadFile = File(...)):
 
     # Convert to OpenCV format
     image = cv2.imdecode(np.frombuffer(file_bytes, np.uint8), cv2.IMREAD_COLOR)
+    image = preprocess_image_for_ocr(image)
 
     logger.info(f"Received file: {file.filename}, Size: {file.size} bytes, Type: {file.content_type}")
 
@@ -124,15 +140,21 @@ async def process_ocr(file: UploadFile = File(...)):
         logger.warning("Low contrast detected.")
         return {"error": "Image contrast is too low for OCR processing."}
 
+    endTime = time.time()
+    logger.info(f"Processing time - OCR: {endTime - startTime:.2f} seconds")
+
     # Classify document type
     doc_type = classify_document(results)
     logger.info(f"Document Type: {doc_type}")
 
+    res = None
     if doc_type == "unknown":
-        return {"error": "No Aadhaar or PAN detected"}
+        res = {"error": "No Aadhaar or PAN detected"}
     elif doc_type == "aadhaar":
-        return process_aadhaar(results)
+        res = process_aadhaar(results)
     elif doc_type == "pan":
-        return process_pan(results)
-    else:
-        return None
+        res = process_pan(results)
+    
+    endTime2 = time.time()
+    logger.info(f"Processing time - Extract: {endTime2 - endTime:.2f} seconds")
+    return res
