@@ -7,6 +7,8 @@ import re
 import os
 import logging
 import time
+from PIL import Image
+import io
 from logging.handlers import RotatingFileHandler
 from aadhaar import check_if_aadhaar, process_aadhaar
 from pan import check_if_pan, process_pan
@@ -158,3 +160,62 @@ async def process_ocr(file: UploadFile = File(...)):
     endTime2 = time.time()
     logger.info(f"Processing time - Extract: {endTime2 - endTime:.2f} seconds")
     return res
+
+def read_image_bytes(file_bytes: bytes) -> np.ndarray:
+    """Convert bytes to OpenCV image"""
+    pil_image = Image.open(io.BytesIO(file_bytes)).convert("RGB")
+    return np.array(pil_image)
+
+def is_blurry_2(image: np.ndarray, threshold: float = 25.0) -> bool:
+    """Returns True if image is blurry."""
+    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    variance = cv2.Laplacian(gray, cv2.CV_64F).var()
+    print(f"Blur variance: {variance}")
+    return variance < threshold
+
+def preprocess_image_for_ocr_2(image: np.ndarray) -> np.ndarray:
+    """Enhance contrast and prepare image for OCR."""
+    gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    
+    # Apply CLAHE to enhance contrast
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    enhanced = clahe.apply(gray)
+
+    return cv2.cvtColor(enhanced, cv2.COLOR_GRAY2RGB)  # Convert back to RGB for EasyOCR    
+
+@app.post("/process_ocr_text/")
+async def process_ocr_text(file: UploadFile = File(...)):
+    logger.info(f"Received file: {file.filename}, Size: {file.size} bytes, Type: {file.content_type}")
+    startTime = time.time()
+    # ✅ File type restriction
+    if file.content_type not in ["image/jpeg", "image/png"]:
+        logger.error(f"Invalid file type: {file.filename} - {file.content_type}")
+        raise HTTPException(status_code=400, detail="Only JPEG and PNG files are allowed")
+
+    # ✅ File size restriction (5MB)
+    if file.size > 5 * 1024 * 1024:
+        logger.error(f"File size too large: {file.filename} - {file.size} bytes")
+        raise HTTPException(status_code=400, detail="File size must be less than 5MB")
+
+    file_bytes = await file.read()
+
+    # Convert to OpenCV format
+    image = cv2.imdecode(np.frombuffer(file_bytes, np.uint8), cv2.IMREAD_COLOR)
+    image = preprocess_image_for_ocr(image)
+    img_np = preprocess_image_for_ocr_2(image)
+
+    # ✅ Step 1: Check for blurriness
+    if is_blurry_2(img_np):
+        return {"error": "Image is too blurry"}
+
+    # Extract results using EasyOCR
+    text = reader.readtext(img_np, detail=0, paragraph=True)
+    if text:
+        results = {"text": "\n".join(text)}
+    else:
+        results = {"text": "No text detected"}
+    
+    endTime = time.time()
+    logger.info(f"Processing time - OCR: {endTime - startTime:.2f} seconds")
+
+    return results

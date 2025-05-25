@@ -30,8 +30,8 @@ logs/
 # Ignore temporary or backup files
 *.bak
 *.swp
-.DS_Store  # macOS
-Thumbs.db  # Windows
+.DS_Store
+Thumbs.db
 
 # Ignore IDE-specific files
 .vscode/
