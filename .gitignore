@@ -37,6 +37,7 @@ Thumbs.db
 .vscode/
 .idea/
 *.iml
+*.code-workspace
 
 # Ignore test reports and coverage
 htmlcov/
